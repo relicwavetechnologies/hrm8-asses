@@ -3,7 +3,13 @@
  * Handles communication with the hrm8-backend for registration and auth
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const RAW_API_BASE_URL = import.meta.env.VITE_API_URL as string | undefined;
+
+if (!RAW_API_BASE_URL || !RAW_API_BASE_URL.trim()) {
+    throw new Error('Missing VITE_API_URL. Set it in your environment (e.g. .env).');
+}
+
+const API_BASE_URL = RAW_API_BASE_URL.trim().replace(/\/+$/, '');
 
 interface ApiResponse<T = unknown> {
     success: boolean;
@@ -359,4 +365,3 @@ class ApiClient {
 export const apiClient = new ApiClient(API_BASE_URL);
 
 export type { RegisterRequest, RegisterResponse, UserData, ApiResponse };
-
