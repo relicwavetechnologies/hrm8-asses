@@ -372,6 +372,25 @@ const Dashboard = () => {
 
   const [settingsSubTab, setSettingsSubTab] = useState<'company' | 'credits'>('company');
   const { logout } = useAuth();
+  const [isUpgradingToAts, setIsUpgradingToAts] = useState(false);
+
+  const handleUpgradeToAts = async () => {
+    try {
+      setIsUpgradingToAts(true);
+      const response = await apiClient.initiateUpgrade();
+      if (!response.success) {
+        toast.error(response.error || 'Failed to start ATS upgrade');
+        return;
+      }
+      await apiClient.completeUpgrade();
+      const redirectUrl = response.data?.redirectUrl || 'https://hrm8.com/login?upgrade=1';
+      window.location.href = redirectUrl;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to start ATS upgrade');
+    } finally {
+      setIsUpgradingToAts(false);
+    }
+  };
   
   // Credit balance state
   const [creditBalance, setCreditBalance] = useState(0);
@@ -1068,14 +1087,32 @@ const Dashboard = () => {
   };
 
   // Assign assessments to existing candidate
-  const handleAssignAssessments = (candidateId: string, roleId: string, assessmentIds: string[]) => {
+  const handleAssignAssessments = async (candidateId: string, roleId: string, assessmentIds: string[]) => {
+    if (assessmentIds.length === 0) return;
+    const packageId = assessmentIds[0];
+    const assignRes = await apiClient.assignPackageToCandidate(roleId, candidateId, { packageId });
+    if (!assignRes.success) {
+      toast.error(assignRes.error || 'Failed to assign package to candidate');
+      return;
+    }
+
+    const inviteRes = await apiClient.sendCandidateInvite(roleId, candidateId);
+    if (!inviteRes.success) {
+      toast.error(inviteRes.error || 'Package assigned but invite failed');
+      return;
+    }
+
+    const statusRes = await apiClient.getCandidateAssessmentStatus(roleId, candidateId);
+    const hasOpened = Boolean(statusRes.data?.timeline?.some((item: any) => item.linkOpenedAt));
+    const hasSubmitted = Boolean(statusRes.data?.timeline?.some((item: any) => item.submittedAt));
+
     const newResults: CandidateAssessmentResult[] = assessmentIds.map(id => {
       const assessment = assessments.find(a => a.id === id)!;
       return {
         assessmentId: id,
         assessmentName: assessment.name,
         category: assessment.category,
-        status: 'pending' as const,
+        status: hasSubmitted ? 'completed' as const : hasOpened ? 'in_progress' as const : 'invited' as const,
         assignedAt: new Date(),
       };
     });
@@ -1117,7 +1154,7 @@ const Dashboard = () => {
       });
     }
 
-    toast.success(`${assessmentIds.length} assessment${assessmentIds.length !== 1 ? 's' : ''} assigned successfully`);
+    toast.success(`Package assigned and invite sent successfully`);
   };
 
   // Open assign dialog for a candidate
@@ -1189,7 +1226,16 @@ const Dashboard = () => {
   };
 
   // Candidate action handlers
-  const handleResendInvitation = (candidate: RoleCandidate) => {
+  const handleResendInvitation = async (candidate: RoleCandidate, roleId?: string) => {
+    if (!roleId) {
+      toast.success(`Invitation resent to ${candidate.email}`);
+      return;
+    }
+    const res = await apiClient.sendCandidateInvite(roleId, candidate.id);
+    if (!res.success) {
+      toast.error(res.error || 'Failed to resend invitation');
+      return;
+    }
     toast.success(`Invitation resent to ${candidate.email}`);
   };
 
@@ -1550,19 +1596,24 @@ const Dashboard = () => {
                   : 'Welcome back! Here\'s what\'s happening with your assessments.'}
               </p>
             </div>
-            {activeTab === 'assessments' ? (
-              <Button variant="hero" onClick={() => openCreateBundleDialog()}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Bundle
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={handleUpgradeToAts} disabled={isUpgradingToAts}>
+                {isUpgradingToAts ? 'Starting Upgrade...' : 'Upgrade to Full ATS'}
               </Button>
-            ) : activeTab === 'profile' || activeTab === 'addons' ? null : (
-              <Link to="/wizard">
-                <Button variant="hero">
+              {activeTab === 'assessments' ? (
+                <Button variant="hero" onClick={() => openCreateBundleDialog()}>
                   <Plus className="h-4 w-4 mr-2" />
-                  New Assessment
+                  Create Bundle
                 </Button>
-              </Link>
-            )}
+              ) : activeTab === 'profile' || activeTab === 'addons' ? null : (
+                <Link to="/wizard">
+                  <Button variant="hero">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Assessment
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
 
           {activeTab === 'dashboard' && (
@@ -2147,7 +2198,7 @@ const Dashboard = () => {
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end" className="w-48 bg-popover">
                                         {candidate.status === 'invited' && (
-                                          <DropdownMenuItem onClick={() => handleResendInvitation(candidate)}>
+                                          <DropdownMenuItem onClick={() => handleResendInvitation(candidate, selectedRole?.id)}>
                                             <Send className="h-4 w-4 mr-2" />
                                             Resend Invitation
                                           </DropdownMenuItem>
@@ -3098,7 +3149,7 @@ const Dashboard = () => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48 bg-popover">
                               {candidate.status === 'invited' && (
-                                <DropdownMenuItem onClick={() => handleResendInvitation(candidate)}>
+                                <DropdownMenuItem onClick={() => handleResendInvitation(candidate, selectedRole?.id)}>
                                   <Send className="h-4 w-4 mr-2" />
                                   Resend Invitation
                                 </DropdownMenuItem>

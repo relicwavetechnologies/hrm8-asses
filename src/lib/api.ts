@@ -360,6 +360,71 @@ class ApiClient {
             body: JSON.stringify({ assessments }),
         });
     }
+
+    async getPricingPreview(jobId: string, payload: {
+        packageId: string;
+        candidateCount: number;
+    }): Promise<ApiResponse<any>> {
+        return this.request(`/api/assess/jobs/${jobId}/pricing-preview`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    }
+
+    async initCheckout(jobId: string, payload: {
+        packageId: string;
+        candidateCount: number;
+    }): Promise<ApiResponse<any>> {
+        return this.request(`/api/assess/jobs/${jobId}/checkout/init`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    }
+
+    async activateAssessJob(jobId: string, payload: {
+        packageId?: string;
+        candidateCount?: number;
+        orderId?: string;
+        checkoutSessionId?: string;
+    }): Promise<ApiResponse<any>> {
+        return this.request(`/api/assess/jobs/${jobId}/activate`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    }
+
+    async assignPackageToCandidate(jobId: string, candidateId: string, payload: {
+        packageId: string;
+    }): Promise<ApiResponse<any>> {
+        return this.request(`/api/assess/jobs/${jobId}/candidates/${candidateId}/assign-package`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    }
+
+    async sendCandidateInvite(jobId: string, candidateId: string): Promise<ApiResponse<any>> {
+        return this.request(`/api/assess/jobs/${jobId}/candidates/${candidateId}/send-invite`, {
+            method: 'POST',
+        });
+    }
+
+    async getCandidateAssessmentStatus(jobId: string, candidateId: string): Promise<ApiResponse<any>> {
+        return this.request(`/api/assess/jobs/${jobId}/candidates/${candidateId}/assessment-status`, {
+            method: 'GET',
+        });
+    }
+
+    async initiateUpgrade(): Promise<ApiResponse<any>> {
+        return this.request('/api/assess/upgrade/initiate', {
+            method: 'POST',
+        });
+    }
+
+    async completeUpgrade(): Promise<ApiResponse<any>> {
+        return this.request('/api/assess/upgrade/complete', {
+            method: 'POST',
+        });
+    }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

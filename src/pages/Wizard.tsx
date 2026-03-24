@@ -634,27 +634,62 @@ const Wizard = () => {
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const finalizeAndActivateAssessFlow = async (jobId: string, pack: AssessmentPack) => {
+    const assessmentsToCreate = configuredAssessments
+      .slice(0, pack.assessmentCount)
+      .map(a => ({
+        name: a.name,
+        type: 'ASSESSMENT',
+        questionType: a.questionType
+      }));
+
+    await apiClient.finalizeJob(jobId, assessmentsToCreate);
+
+    const candidateCount = Math.max(1, wizardData.candidates.length);
+    const pricingRes = await apiClient.getPricingPreview(jobId, {
+      packageId: pack.id,
+      candidateCount,
+    });
+    if (!pricingRes.success) {
+      throw new Error(pricingRes.error || 'Unable to calculate pricing');
+    }
+
+    const checkoutRes = await apiClient.initCheckout(jobId, {
+      packageId: pack.id,
+      candidateCount,
+    });
+    if (!checkoutRes.success) {
+      throw new Error(checkoutRes.error || 'Unable to initialize checkout');
+    }
+
+    const activationRes = await apiClient.activateAssessJob(jobId, {
+      packageId: pack.id,
+      candidateCount,
+      orderId: `assess_order_${Date.now()}`,
+      checkoutSessionId: checkoutRes.data?.checkoutSessionId,
+    });
+    if (!activationRes.success) {
+      throw new Error(activationRes.error || 'Unable to activate assess job');
+    }
+  };
+
   const handlePayment = async () => {
     setIsRegistering(true);
     setRegistrationError(null);
 
     try {
+      if (!selectedPack) {
+        throw new Error('Please select an assessment package before completing order');
+      }
+
       // If already authenticated, just create the job and proceed
       if (isAuthenticated) {
           if (existingJobId && selectedPack) {
-               const assessmentsToCreate = configuredAssessments
-                  .slice(0, selectedPack.assessmentCount)
-                  .map(a => ({
-                      name: a.name,
-                      type: 'ASSESSMENT',
-                      questionType: a.questionType
-                  }));
-               
-               await apiClient.addAssessmentsToJob(existingJobId, assessmentsToCreate);
-               
+               await finalizeAndActivateAssessFlow(existingJobId, selectedPack);
+
                toast({
                    title: 'Success!',
-                   description: 'Assessments added successfully.',
+                   description: 'Assessment package activated successfully.',
                });
                navigate('/dashboard');
                return;
@@ -674,21 +709,12 @@ const Wizard = () => {
           });
           
           if (jobRes.success && jobRes.data && selectedPack) {
-              // Finalize job with selected assessments
-              const assessmentsToCreate = configuredAssessments
-                  .slice(0, selectedPack.assessmentCount)
-                  .map(a => ({
-                      name: a.name,
-                      type: 'ASSESSMENT',
-                      questionType: a.questionType
-                  }));
-              
-              await apiClient.finalizeJob(jobRes.data.jobId, assessmentsToCreate);
+              await finalizeAndActivateAssessFlow(jobRes.data.jobId, selectedPack);
           }
 
           toast({
               title: 'Success!',
-              description: 'Job created successfully.',
+              description: 'Job created and package activated successfully.',
           });
           navigate('/dashboard'); // Changed from /success to /dashboard per typical flow
           return;
@@ -742,16 +768,7 @@ const Wizard = () => {
       });
 
       if (jobRes.success && jobRes.data && selectedPack) {
-          // Finalize job with selected assessments
-          const assessmentsToCreate = configuredAssessments
-              .slice(0, selectedPack.assessmentCount)
-              .map(a => ({
-                  name: a.name,
-                  type: 'ASSESSMENT',
-                  questionType: a.questionType
-              }));
-          
-          await apiClient.finalizeJob(jobRes.data.jobId, assessmentsToCreate);
+          await finalizeAndActivateAssessFlow(jobRes.data.jobId, selectedPack);
       }
       
       // Registration successful, proceed to payment/success
@@ -760,9 +777,7 @@ const Wizard = () => {
         description: 'Your company account has been registered. Proceeding to payment...',
       });
 
-      // TODO: Integrate with payment gateway here
-      // For now, go to success page
-      navigate('/success');
+      navigate('/dashboard');
     } catch (error) {
       console.error('Registration error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Registration failed. Please try again.';
