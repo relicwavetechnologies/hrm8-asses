@@ -1249,20 +1249,42 @@ const Dashboard = () => {
     toast.success('Candidate removed from role');
   };
 
-  const handleRoleStatusChange = (roleId: string, newStatus: Role['status']) => {
-    setRoles(prev => prev.map(role => 
-      role.id === roleId 
+  const handleRoleStatusChange = async (roleId: string, newStatus: Role['status']) => {
+    const previousRoles = roles;
+    const previousSelectedRole = selectedRole;
+
+    setRoles(prev => prev.map(role =>
+      role.id === roleId
         ? { ...role, status: newStatus }
         : role
     ));
-    
-    // Update selected role if viewing details
+
     if (selectedRole?.id === roleId) {
       setSelectedRole(prev => prev ? { ...prev, status: newStatus } : null);
     }
-    
-    const statusLabels = { active: 'Active', completed: 'Completed', archived: 'Archived' };
-    toast.success(`Role marked as ${statusLabels[newStatus]}`);
+
+    try {
+      const response = await apiClient.updateAssessJobStatus(roleId, newStatus);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to update role status');
+      }
+
+      const updatedRoleRaw = (response.data as any)?.job;
+      if (updatedRoleRaw) {
+        const updatedRole = mapApiJobToRole(updatedRoleRaw);
+        setRoles(prev => prev.map(role => role.id === roleId ? updatedRole : role));
+        if (previousSelectedRole?.id === roleId) {
+          setSelectedRole(updatedRole);
+        }
+      }
+
+      const statusLabels = { active: 'Active', completed: 'Completed', archived: 'Archived' };
+      toast.success(`Role marked as ${statusLabels[newStatus]}`);
+    } catch (error) {
+      setRoles(previousRoles);
+      setSelectedRole(previousSelectedRole);
+      toast.error(error instanceof Error ? error.message : 'Failed to update role status');
+    }
   };
 
   const toggleFavourite = (assessmentId: string) => {

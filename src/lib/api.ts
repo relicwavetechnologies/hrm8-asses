@@ -503,6 +503,13 @@ class ApiClient {
         });
     }
 
+    async updateAssessJobStatus(jobId: string, status: 'active' | 'completed' | 'archived'): Promise<ApiResponse<any>> {
+        return this.request(`/api/assess/jobs/${jobId}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status }),
+        });
+    }
+
     async addAssessmentsToJob(jobId: string, assessments: any[]): Promise<ApiResponse<{ message: string }>> {
         return this.request(`/api/assess/jobs/${jobId}/assessments`, {
             method: 'POST',
