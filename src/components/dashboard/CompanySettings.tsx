@@ -149,6 +149,36 @@ interface CompanySettingsProps {
   onSaveProfile?: (payload: Partial<CompanyProfile>) => Promise<void> | void;
 }
 
+function normalizeCreditPurchase(entry: unknown, index: number): CreditPurchase {
+  const row = (entry && typeof entry === 'object') ? (entry as Record<string, unknown>) : {};
+  return {
+    id: (typeof row.id === 'string' && row.id) ? row.id : `credit-purchase-${index}`,
+    quantity: Number(row.quantity || 0),
+    pricePerCredit: Number(row.pricePerCredit || 0),
+    totalPaid: Number(row.totalPaid || 0),
+    purchasedAt: row.purchasedAt ? new Date(String(row.purchasedAt)) : new Date(),
+  };
+}
+
+function normalizeCreditBalance(value: unknown) {
+  const source = (value && typeof value === 'object') ? (value as Record<string, unknown>) : {};
+  const purchaseHistory = Array.isArray(source.purchaseHistory)
+    ? source.purchaseHistory.map((entry, index) => normalizeCreditPurchase(entry, index))
+    : [];
+
+  return {
+    id: (typeof source.id === 'string' && source.id) ? source.id : 'credit-balance',
+    availableCredits: Number(source.availableCredits || 0),
+    totalPurchased: Number(
+      source.totalPurchased ??
+      purchaseHistory.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    ),
+    totalUsed: Number(source.totalUsed || 0),
+    lastPurchase: source.lastPurchase ? normalizeCreditPurchase(source.lastPurchase, 0) : undefined,
+    purchaseHistory,
+  };
+}
+
 export function CompanySettings({
   initialSubTab = 'company',
   teamMembers = [],
@@ -159,6 +189,7 @@ export function CompanySettings({
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>({
     ...defaultCompanyProfile,
     ...(profileData || {}),
+    creditBalance: normalizeCreditBalance((profileData as any)?.creditBalance),
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
@@ -197,7 +228,7 @@ export function CompanySettings({
       addresses: Array.isArray(profileData.addresses) ? profileData.addresses as Address[] : prev.addresses,
       contacts: Array.isArray(profileData.contacts) ? profileData.contacts : prev.contacts,
       paymentMethods: Array.isArray(profileData.paymentMethods) ? profileData.paymentMethods : prev.paymentMethods,
-      creditBalance: (profileData.creditBalance as any) || prev.creditBalance,
+      creditBalance: normalizeCreditBalance(profileData.creditBalance),
       createdAt: profileData.createdAt ? new Date(profileData.createdAt as any) : prev.createdAt,
       updatedAt: profileData.updatedAt ? new Date(profileData.updatedAt as any) : prev.updatedAt,
     }));
