@@ -39,7 +39,14 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/wizard" element={<Wizard />} />
             <Route path="/success" element={<Success />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/accept-invitation" element={<AcceptInvitation />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

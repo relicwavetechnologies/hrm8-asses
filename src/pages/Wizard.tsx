@@ -101,8 +101,42 @@ const Wizard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const existingJobId = searchParams.get('existingJobId');
+  const paymentStateParam = (
+    searchParams.get('assess_payment')
+    || searchParams.get('payment_status')
+    || searchParams.get('status')
+    || ''
+  ).toLowerCase();
+  const paymentSuccessParam = (
+    searchParams.get('payment_success')
+    || searchParams.get('success')
+    || ''
+  ).toLowerCase();
+  const paymentCancelParam = (
+    searchParams.get('payment_cancel')
+    || searchParams.get('canceled')
+    || searchParams.get('cancelled')
+    || ''
+  ).toLowerCase();
+  const isPaymentReturnSuccess =
+    paymentStateParam === 'success'
+    || paymentSuccessParam === 'true'
+    || paymentSuccessParam === '1'
+    || paymentStateParam === 'paid';
+  const isPaymentReturnCancel =
+    paymentStateParam === 'cancel'
+    || paymentStateParam === 'canceled'
+    || paymentStateParam === 'cancelled'
+    || paymentCancelParam === 'true'
+    || paymentCancelParam === '1';
+  const isPaymentReturn = isPaymentReturnSuccess || isPaymentReturnCancel;
   const initialStep = parseInt(searchParams.get('step') || '1', 10);
-  const [currentStep, setCurrentStep] = useState(existingJobId ? initialStep : 1);
+  const [currentStep, setCurrentStep] = useState(() => (
+    isPaymentReturn ? 5 : existingJobId ? initialStep : 1
+  ));
+  const [checkoutPhase, setCheckoutPhase] = useState<'idle' | 'preparing' | 'confirming'>(
+    isPaymentReturnSuccess ? 'confirming' : 'idle'
+  );
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendations, setRecommendations] = useState<RecommendationResult>({ primary: [], suggested: [] });
   const [showSelectedAssessments, setShowSelectedAssessments] = useState(false);
@@ -363,12 +397,17 @@ const Wizard = () => {
       }));
       setAuthorizedConfirmed(true);
       if (!existingJobId) {
-        setCurrentStep(3); // Skip to Position step only for new jobs
+        if (isPaymentReturnSuccess || checkoutPhase !== 'idle') {
+          // Keep user on checkout step while payment finalization runs.
+          setCurrentStep(5);
+        } else if (!isPaymentReturn) {
+          setCurrentStep(3); // Skip to Position step only for new jobs
+        }
       }
     };
 
     void hydrateFromSession();
-  }, [isAuthenticated, user, existingJobId]);
+  }, [isAuthenticated, user, existingJobId, isPaymentReturn, isPaymentReturnSuccess, checkoutPhase]);
   
   // Persist custom bundles to localStorage
   useEffect(() => {
@@ -831,6 +870,8 @@ const Wizard = () => {
   const handlePayment = async () => {
     setIsRegistering(true);
     setRegistrationError(null);
+    setCheckoutPhase('preparing');
+    setCurrentStep(5);
 
     try {
       const selectedAssessments = getAllSelectedAssessments();
@@ -939,6 +980,7 @@ const Wizard = () => {
       console.error('Registration error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Registration failed. Please try again.';
       setRegistrationError(errorMessage);
+      setCheckoutPhase('idle');
       toast({
         title: 'Error',
         description: errorMessage,
@@ -950,11 +992,11 @@ const Wizard = () => {
   };
 
   useEffect(() => {
-    const assessPaymentState = searchParams.get('assess_payment') || searchParams.get('payment_status');
-    const isSuccess = assessPaymentState === 'success';
-    const isCancel = assessPaymentState === 'cancel' || assessPaymentState === 'canceled';
+    if (loading) return;
 
-    if (isCancel) {
+    if (isPaymentReturnCancel) {
+      setCheckoutPhase('idle');
+      setCurrentStep(5);
       clearPendingCheckout();
       toast({
         title: 'Payment canceled',
@@ -964,9 +1006,13 @@ const Wizard = () => {
       return;
     }
 
-    if (!isSuccess || paymentFinalizeInFlightRef.current) return;
+    if (!isPaymentReturnSuccess || paymentFinalizeInFlightRef.current) return;
+    setCheckoutPhase('confirming');
+    setCurrentStep(5);
     const pending = readPendingCheckout();
-    if (!pending) return;
+    const callbackJobId = String(searchParams.get('jobId') || '').trim();
+    if (!pending && !isAuthenticated) return;
+    if (!pending && !callbackJobId) return;
 
     const finalize = async () => {
       paymentFinalizeInFlightRef.current = true;
@@ -976,40 +1022,42 @@ const Wizard = () => {
       try {
         const paymentAttemptId =
           searchParams.get('payment_attempt_id') ||
-          pending.paymentAttemptId;
+          pending?.paymentAttemptId ||
+          '';
+        const activationJobId = pending?.jobId || callbackJobId;
+        let activationRes: Awaited<ReturnType<typeof apiClient.activateAssessJob>> | null = null;
 
-        let status = 'PENDING';
-        for (let i = 0; i < 12; i += 1) {
-          const paymentRes = await apiClient.getBillingPaymentStatus(paymentAttemptId);
-          if (!paymentRes.success) {
-            throw new Error(paymentRes.error || 'Failed to verify payment status');
+        for (let i = 0; i < 20; i += 1) {
+          activationRes = await apiClient.activateAssessJob(activationJobId, {
+            packageId: pending?.packageId,
+            candidateCount: pending?.candidateCount,
+            paymentAttemptId: paymentAttemptId || undefined,
+            checkoutSessionId: paymentAttemptId || undefined,
+            orderId: `assess_order_${Date.now()}`,
+          });
+
+          if (activationRes.success) {
+            break;
           }
 
-          status = String(paymentRes.data?.status || 'PENDING').toUpperCase();
-          if (status === 'SUCCEEDED') break;
-          if (status === 'FAILED' || status === 'REFUNDED') {
-            throw new Error(`Payment ${status.toLowerCase()}. Please try checkout again.`);
+          const message = String(activationRes.error || '').toLowerCase();
+          const stillPending =
+            message.includes('payment is not completed yet') ||
+            message.includes('payment confirmation is still pending');
+
+          if (!stillPending) {
+            throw new Error(activationRes.error || 'Unable to activate assess job after payment');
           }
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+
+          await new Promise((resolve) => setTimeout(resolve, 3000));
         }
 
-        if (status !== 'SUCCEEDED') {
-          throw new Error('Payment confirmation is still pending. Please retry in a few moments.');
-        }
-
-        const activationRes = await apiClient.activateAssessJob(pending.jobId, {
-          packageId: pending.packageId,
-          candidateCount: pending.candidateCount,
-          paymentAttemptId,
-          checkoutSessionId: paymentAttemptId,
-          orderId: `assess_order_${Date.now()}`,
-        });
-
-        if (!activationRes.success) {
-          throw new Error(activationRes.error || 'Unable to activate assess job after payment');
+        if (!activationRes?.success) {
+          throw new Error(activationRes?.error || 'Payment confirmation is still pending. Please keep this page open and retry in a few moments.');
         }
 
         clearPendingCheckout();
+        setCheckoutPhase('idle');
         toast({
           title: 'Success!',
           description: 'Payment confirmed and assessment package activated.',
@@ -1018,6 +1066,7 @@ const Wizard = () => {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to finalize payment';
         setRegistrationError(message);
+        setCheckoutPhase('confirming');
         toast({
           title: 'Payment verification pending',
           description: message,
@@ -1030,7 +1079,7 @@ const Wizard = () => {
     };
 
     void finalize();
-  }, [searchParams, navigate, toast]);
+  }, [searchParams, navigate, toast, isPaymentReturnCancel, isPaymentReturnSuccess, loading, isAuthenticated]);
 
   const [configuredAssessments, setConfiguredAssessments] = useState<Array<{ name: string; questionType: string; reason?: string }>>([]);
 
@@ -1158,6 +1207,53 @@ const Wizard = () => {
     );
   }
 
+  if (checkoutPhase === 'preparing' || checkoutPhase === 'confirming' || isPaymentReturnSuccess) {
+    const isConfirming = checkoutPhase === 'confirming' || isPaymentReturnSuccess;
+
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container py-16">
+          <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card p-10 shadow-card-lg">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {isConfirming ? 'Confirming your payment...' : 'Preparing your secure checkout...'}
+              </h1>
+              <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+                {isConfirming
+                  ? 'We are verifying your payment and activating your assessment workspace. Please keep this page open.'
+                  : 'We are creating your account, setting up your role, and redirecting you to payment.'}
+              </p>
+              {registrationError ? (
+                <div className="mt-6 w-full rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-left">
+                  <p className="text-sm font-medium text-destructive">We still need a moment to finish setup.</p>
+                  <p className="mt-2 text-sm text-destructive">{registrationError}</p>
+                  <div className="mt-4 flex items-center justify-center gap-3">
+                    <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+                      Retry confirmation
+                    </Button>
+                    <Button type="button" onClick={() => navigate('/dashboard')}>
+                      Go to dashboard
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-6 rounded-lg border border-border bg-muted/40 px-4 py-3">
+                  <p className="text-sm text-muted-foreground">
+                    This page will move forward automatically as soon as the payment provider confirms the transaction.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -1203,6 +1299,36 @@ const Wizard = () => {
         {/* Step Content */}
         <div className="max-w-2xl mx-auto">
           <div className="bg-card rounded-2xl border border-border shadow-card-lg p-8">
+            {isPaymentReturnSuccess && (
+              <div className={`mb-6 rounded-lg border p-4 ${registrationError ? 'border-destructive/40 bg-destructive/5' : 'border-primary/30 bg-primary/5'}`}>
+                <div className="flex items-center gap-2">
+                  {isFinalizingPayment ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <p className="text-sm font-medium text-foreground">Confirming your payment and activating your role...</p>
+                    </>
+                  ) : registrationError ? (
+                    <>
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      <p className="text-sm font-medium text-destructive">Payment confirmation needs attention.</p>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-medium text-foreground">Payment return detected. Finalizing setup...</p>
+                    </>
+                  )}
+                </div>
+                {registrationError && (
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-xs text-destructive">{registrationError}</p>
+                    <Button type="button" size="sm" variant="outline" onClick={() => window.location.reload()}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
             
             {/* Step 1: Company Details */}
             {currentStep === 1 && (
