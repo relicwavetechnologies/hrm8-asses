@@ -84,7 +84,7 @@ const Footer = () => {
           </p>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
-              Secure payments powered by Stripe
+              Secure hosted checkout for HRM8 billing
             </span>
           </div>
         </div>

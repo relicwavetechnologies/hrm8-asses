@@ -15,15 +15,15 @@ const faqs = [
     items: [
       {
         question: 'Do I need to create an account to purchase assessments?',
-        answer: 'No! You can complete your first assessment purchase as a guest. After payment, you\'ll be prompted to create a password to access your results dashboard. This keeps the process fast while ensuring you can always access your data.',
+        answer: 'Yes. HRM8 Assess creates your company account during signup so your jobs, candidates, invoices, and results are available in the dashboard immediately after checkout completes.',
       },
       {
         question: 'How quickly are assessments sent after payment?',
-        answer: 'Immediately. As soon as your payment is confirmed, candidates receive their invitation emails within minutes. You\'ll see the status change to "Invited" in your confirmation screen.',
+        answer: 'Once payment is confirmed and your role is activated, you can review the dashboard and launch invitations from HRM8. Candidate status updates appear in real time after invites are sent.',
       },
       {
         question: 'What payment methods do you accept?',
-        answer: 'We accept all major credit cards (Visa, Mastercard, American Express) via our secure Stripe payment integration. All payments are encrypted and PCI-compliant.',
+        answer: 'We support major card payments through our secure checkout provider. Payments are encrypted, processed over PCI-compliant infrastructure, and the billing records are synced back into HRM8.',
       },
     ],
   },
@@ -40,7 +40,7 @@ const faqs = [
       },
       {
         question: 'What if a candidate doesn\'t receive the invitation?',
-        answer: 'You can resend invitations from your dashboard. We recommend asking candidates to check their spam folder. If issues persist, contact our support team.',
+        answer: 'You can resend invitations from your dashboard. We recommend asking candidates to check spam or promotions folders first. If delivery issues continue, contact our support team and we can help trace the send.',
       },
       {
         question: 'How long do candidates have to complete the assessment?',

@@ -66,7 +66,6 @@ import { toast } from 'sonner';
 import {
   CompanyProfile,
   Address,
-  PaymentMethod,
   SettingsSubTab,
   CompanySize,
   AddressType,
@@ -197,9 +196,6 @@ export function CompanySettings({
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Address | null>(null);
   const [locationForm, setLocationForm] = useState<Partial<Address>>({});
-  
-  // Payment method dialog state
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   
   // Email editing state
   const [isEditingEmail, setIsEditingEmail] = useState(false);
@@ -375,31 +371,6 @@ export function CompanySettings({
       })),
     }));
     toast.success('Primary location updated');
-  };
-  
-  // Payment handlers
-  const handleSetDefaultPayment = (paymentId: string) => {
-    setCompanyProfile(prev => ({
-      ...prev,
-      paymentMethods: prev.paymentMethods.map(pm => ({
-        ...pm,
-        isDefault: pm.id === paymentId,
-      })),
-    }));
-    toast.success('Default payment method updated');
-  };
-  
-  const handleRemovePayment = (paymentId: string) => {
-    const payment = companyProfile.paymentMethods.find(pm => pm.id === paymentId);
-    if (payment?.isDefault && companyProfile.paymentMethods.length > 1) {
-      toast.error('Please set another payment method as default first');
-      return;
-    }
-    setCompanyProfile(prev => ({
-      ...prev,
-      paymentMethods: prev.paymentMethods.filter(pm => pm.id !== paymentId),
-    }));
-    toast.success('Payment method removed');
   };
   
   // Credit tier selection state (default to 100 credits)
@@ -1025,70 +996,66 @@ export function CompanySettings({
                 <CreditCard className="h-5 w-5 text-primary" />
                 Payment Methods
               </h3>
-              <Button variant="outline" onClick={() => setPaymentDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Payment Method
-              </Button>
+              <Badge variant="outline" className="border-primary/20 text-primary">
+                Managed in Checkout
+              </Badge>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {companyProfile.paymentMethods.map(pm => (
-                <div
-                  key={pm.id}
-                  className={`p-4 rounded-lg border-2 transition-colors ${
-                    pm.isDefault 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                        <CreditCard className="h-5 w-5 text-foreground" />
+            <div className="rounded-xl border border-border bg-muted/30 p-4 mb-4">
+              <p className="text-sm text-foreground">
+                Saved cards and wallet methods are created during secure checkout and synced back here when available.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                HRM8 Assess does not support adding, deleting, or changing payment methods from settings yet. To update billing methods, complete the next checkout with the card you want to use or contact support.
+              </p>
+            </div>
+
+            {companyProfile.paymentMethods.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {companyProfile.paymentMethods.map(pm => (
+                  <div
+                    key={pm.id}
+                    className={`p-4 rounded-lg border-2 transition-colors ${
+                      pm.isDefault
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                          <CreditCard className="h-5 w-5 text-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground capitalize">
+                            {pm.cardBrand || pm.type.replace('_', ' ')}
+                          </p>
+                          {pm.last4 && (
+                            <p className="text-sm text-muted-foreground">•••• {pm.last4}</p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-foreground capitalize">
-                          {pm.cardBrand || pm.type.replace('_', ' ')}
-                        </p>
-                        {pm.last4 && (
-                          <p className="text-sm text-muted-foreground">•••• {pm.last4}</p>
-                        )}
-                      </div>
+                      {pm.isDefault && (
+                        <Badge className="bg-primary/10 text-primary border-primary/20">Default</Badge>
+                      )}
                     </div>
-                    {pm.isDefault && (
-                      <Badge className="bg-primary/10 text-primary border-primary/20">Default</Badge>
+
+                    {pm.expiryMonth && pm.expiryYear && (
+                      <p className="text-sm text-muted-foreground">
+                        Expires {pm.expiryMonth.toString().padStart(2, '0')}/{pm.expiryYear}
+                      </p>
                     )}
                   </div>
-                  
-                  {pm.expiryMonth && pm.expiryYear && (
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Expires {pm.expiryMonth.toString().padStart(2, '0')}/{pm.expiryYear}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center gap-2">
-                    {!pm.isDefault && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSetDefaultPayment(pm.id)}
-                        className="flex-1"
-                      >
-                        Set Default
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemovePayment(pm.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border bg-background p-6 text-center">
+                <CreditCard className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium text-foreground">No saved payment methods yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your first successful checkout will attach the payment method details that can be shown here.
+                </p>
+              </div>
+            )}
           </div>
           
           {/* Save Button */}
@@ -1624,33 +1591,6 @@ export function CompanySettings({
             </Button>
             <Button variant="hero" onClick={handleSaveLocation}>
               {editingLocation ? 'Save Changes' : 'Add Location'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Add Payment Method Dialog */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Payment Method</DialogTitle>
-            <DialogDescription>
-              Add a new credit card or payment method to your account
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-6 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-              <CreditCard className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Payment method integration coming soon. Contact support to add or update payment methods.
-            </p>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
-              Close
             </Button>
           </DialogFooter>
         </DialogContent>

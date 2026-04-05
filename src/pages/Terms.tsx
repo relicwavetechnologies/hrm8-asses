@@ -44,7 +44,7 @@ const Terms = () => {
                 <section>
                   <h2 className="text-xl font-semibold text-foreground mb-4">4. Payment Terms</h2>
                   <p>
-                    All prices are in Australian Dollars unless otherwise stated. Payment is required at the time of purchase. We accept major credit cards processed through Stripe.
+                    Prices are shown in the billing currency selected for your workspace unless otherwise stated. Payment is required at the time of purchase. HRM8 uses secure hosted checkout and approved payment processors to collect and settle payment.
                   </p>
                 </section>
 

@@ -17,8 +17,8 @@ const steps = [
     icon: Building2,
     number: 1,
     title: 'Enter Company & User Details',
-    description: 'Tell us about your company and who will be managing the assessments. This only takes a minute.',
-    highlights: ['Company name and industry', 'Your contact information', 'No account creation needed'],
+    description: 'Create your HRM8 Assess workspace with the company and admin details needed to manage assessments after checkout.',
+    highlights: ['Company and account bootstrap', 'Your work email and password', 'Workspace created before checkout'],
   },
   {
     icon: Users,
@@ -45,15 +45,15 @@ const steps = [
     icon: CreditCard,
     number: 5,
     title: 'Pay Securely',
-    description: 'Review your order and pay by credit card. Pricing is transparent and per-candidate.',
-    highlights: ['Clear cost breakdown', 'Secure Stripe payment', 'Instant confirmation'],
+    description: 'Review your order and complete secure checkout. HRM8 confirms payment, activates your assessment role, and prepares your dashboard.',
+    highlights: ['Clear cost breakdown', 'Secure hosted checkout', 'Activation after payment confirmation'],
   },
   {
     icon: Send,
     number: 6,
-    title: 'Assessments Sent',
-    description: 'Candidates receive invitation emails immediately. You can track their progress in real-time.',
-    highlights: ['Instant email invitations', 'Candidates complete on their schedule', 'Secure assessment links'],
+    title: 'Confirm & Launch',
+    description: 'After payment, HRM8 confirms the order, opens your dashboard, and lets you launch candidate invitations from the live role workspace.',
+    highlights: ['Payment confirmation screen', 'Dashboard access right away', 'Launch invitations when you are ready'],
   },
   {
     icon: BarChart3,
@@ -73,7 +73,7 @@ const HowItWorks = () => {
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-primary/20 mb-6">
               <CheckCircle2 className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-primary">No login required to start</span>
+              <span className="text-sm font-medium text-primary">Built for a fast assessment-first signup</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
               How HRM8 Assessments Work
@@ -143,7 +143,7 @@ const HowItWorks = () => {
               Ready to get started?
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
-              No account required. Start your first assessment in under 5 minutes.
+              Create your workspace, complete checkout, and land directly in your dashboard with the role ready to manage.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link to="/wizard">

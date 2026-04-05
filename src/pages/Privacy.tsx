@@ -22,7 +22,7 @@ const Privacy = () => {
                   <ul className="list-disc pl-6 space-y-2">
                     <li>Company information (name, address, industry)</li>
                     <li>User contact details (name, email, phone)</li>
-                    <li>Payment information (processed securely via Stripe)</li>
+                    <li>Payment information and billing metadata (processed securely via our payment providers)</li>
                     <li>Position and hiring information</li>
                   </ul>
                   
@@ -54,7 +54,7 @@ const Privacy = () => {
                   </p>
                   <ul className="list-disc pl-6 space-y-2 mt-2">
                     <li><strong className="text-foreground">Assessment Partners:</strong> To deliver and score assessments</li>
-                    <li><strong className="text-foreground">Payment Processors:</strong> Stripe for secure payment processing</li>
+                    <li><strong className="text-foreground">Payment Processors:</strong> Airwallex and other approved payment partners used for secure checkout and settlement</li>
                     <li><strong className="text-foreground">Service Providers:</strong> Hosting and infrastructure services</li>
                     <li><strong className="text-foreground">Legal Requirements:</strong> When required by law</li>
                   </ul>

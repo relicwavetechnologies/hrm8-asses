@@ -13,7 +13,7 @@ const CTASection = () => {
             Ready to find your best candidates?
           </h2>
           <p className="text-lg text-primary-foreground/80 mb-10">
-            Start sending assessments in minutes. No account setup required for your first order.
+            Create your workspace, complete secure checkout, and start managing assessments in minutes.
           </p>
           <Link to="/wizard">
             <Button

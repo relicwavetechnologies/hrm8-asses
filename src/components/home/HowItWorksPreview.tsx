@@ -16,8 +16,8 @@ const steps = [
   {
     icon: CreditCard,
     number: '03',
-    title: 'Pay & Send',
-    description: 'Review your order, pay securely by card, and candidates receive their assessments instantly.',
+    title: 'Pay & Launch',
+    description: 'Review your order, complete secure checkout, and launch candidate invitations from your live dashboard.',
   },
 ];
 
